@@ -1,135 +1,230 @@
-package.path = package.path .. ';.luarocks/share/lua/5.2/?.lua'
-  ..';.luarocks/share/lua/5.2/?/init.lua'
-package.cpath = package.cpath .. ';.luarocks/lib/lua/5.2/?.so'
+-- BY MOHAMMED HISHAM
+-- BY @Iraq
+-- BY @hgdg
+tdcli = dofile('./tg/tdcli.lua')
+serpent = (loadfile "./libs/serpent.lua")()
+feedparser = (loadfile "./libs/feedparser.lua")()
+require('./bot/utils')
+require('./libs/lua-redis')
+URL = require "socket.url"
+http = require "socket.http"
+https = require "ssl.https"
+ltn12 = require "ltn12"
+json = (loadfile "./libs/JSON.lua")()
+mimetype = (loadfile "./libs/mimetype.lua")()
+redis = (loadfile "./libs/redis.lua")()
+JSON = (loadfile "./libs/dkjson.lua")()
+local lgi = require ('lgi')
+local notify = lgi.require('Notify')
+notify.init ("Telegram updates")
+chats = {}
+plugins = {}
 
-require("./bot/utils")
+function do_notify (user, msg)
+	local n = notify.Notification.new(user, msg)
+	n:show ()
+end
 
-local f = assert(io.popen('/usr/bin/git describe --tags', 'r'))
-VERSION = assert(f:read('*a'))
-f:close()
+function dl_cb (arg, data)
+	-- vardump(data)
+end
 
--- This function is called when tg receive a msg
-function on_msg_receive (msg)
-  if not started then
-    return
+function vardump(value)
+	print(serpent.block(value, {comment=false}))
+end
+
+function load_data(filename)
+	local f = io.open(filename)
+	if not f then
+		return {}
+	end
+	local s = f:read('*all')
+	f:close()
+	local data = JSON.decode(s)
+	return data
+end
+
+function save_data(filename, data)
+	local s = JSON.encode(data)
+	local f = io.open(filename, 'w')
+	f:write(s)
+	f:close()
+end
+
+function whoami()
+	local usr = io.popen("whoami"):read('*a')
+	usr = string.gsub(usr, '^%s+', '')
+	usr = string.gsub(usr, '%s+$', '')
+	usr = string.gsub(usr, '[\n\r]+', ' ') 
+	if usr:match("^root$") then
+		tcpath = '/root/.telegram-cli'
+	elseif not usr:match("^root$") then
+		tcpath = '/home/'..usr..'/.telegram-cli'
+	end
+  print('>> Download Path = '..tcpath)
+end
+
+function match_plugins(msg)
+	for name, plugin in pairs(plugins) do
+		match_plugin(plugin, name, msg)
+	end
+end
+
+function save_config( )
+	serialize_to_file(_config, './data/config.lua')
+	print ('saved config into ./data/config.lua')
+end
+
+function create_config( )
+	io.write('\n\27[1;33mادخل ايدي حسابك لتصبح مطور 👇 \27[0;39;49m\n')
+	local SUDO = tonumber(io.read())
+if not tostring(SUDO):match('%d+') then
+    SUDO = 60809019
   end
-
-  msg = backward_msg_format(msg)
-
-  local receiver = get_receiver(msg)
-  print(receiver)
-  --vardump(msg)
-  --vardump(msg)
-  msg = pre_process_service_msg(msg)
-  if msg_valid(msg) then
-    msg = pre_process_msg(msg)
-    if msg then
-      match_plugins(msg)
-      if redis:get("bot:markread") then
-        if redis:get("bot:markread") == "on" then
-          mark_read(receiver, ok_cb, false)
-        end
-      end
-    end
-  end
+  	io.write('\n\27[1;33mارسل توكن البوت الان 👇 \27[0;39;49m\n')
+	local token = io.read()
+	 	io.write('\n\27[1;33mادخل الان اسم البوت الذي تريده 👇 \27[0;39;49m\n')
+	local botname = io.read()
+	if botname =="" then
+  botname = "كاظم"
+end
+io.write('\n\27[1;33mادخل معرف المطور 👇 \27[0;39;49m\n')
+	local sudouser = io.read()
+	if sudouser =="" then
+  sudouser = "@kazzrr2"
 end
 
-function ok_cb(extra, success, result)
+	config = {
+    enabled_plugins = {
+	"banhammer",
+    "groupmanager",
+    "msg-checks",
+    "plugins",
+    "tools",
+	"replay",
+	"zhrf",
+	"dell",
 
+	},
+    sudo_users = {{SUDO,check_markdown(sudouser)}},
+	SUDO = SUDO,
+	sudouser = check_markdown(sudouser),
+	bot_name = botname,
+    moderation = {data = './data/moderation.json'},
+	info_text = "◈￤welcome Dear\n\n◈￤Basic Developer : @kazzrr2 \n\n◈￤Iraq \n\n◈￤Final Version 1 \n\n◈￤Channel Developer : @hgdg \n\n◈￤Developer of bot : "..sudouser.."\n\n",
+
+  }
+  file = io.open("Iraq.sh", "w")
+file:write([[
+token="]]..token..[["
+if [ ! -f ./tg/tgcli ]; then
+    echo "tg not found"
+    echo "Run $0 install"
+    exit 1
+fi
+if [ $token == "" ]; then
+    echo "token not found"
+    echo "Run install again"
+    exit 1
+fi
+ 
+COUNTER=1
+while(true) do
+curl "https://api.telegram.org/bot"$token"/sendmessage" -F
+./tg/tgcli -s ./bot/bot.lua $@ --bot=$token
+let COUNTER=COUNTER+1 
+done
+]])
+file:close()
+
+	serialize_to_file(config, './data/config.lua')
+	print ('saved config into config.lua')
+	if token=="" then
+print("◈￤ لم تقم بوضع التوكن يجب عليك وضع التوكن في ملف البوت ليعمل السورس\n")
+os.execute(' rm -fr data/config.lua && rm -fr ./launch.sh ')
+print ('\n\n\n you did not Enter token \n i delete file launch and config.lua \n\n\n now Run file instal.sh\n ')
+return
+end
 end
 
-function on_binlog_replay_end()
-  started = true
-  postpone (cron_plugins, false, 60*5.0)
-  -- See plugins/isup.lua as an example for cron
+-- Returns the config from config.lua file.
+-- If file doesn't exist, create it.
 
-  _config = load_config()
+function load_config( )
+	local f = io.open('./data/config.lua', "r")
+  -- If config.lua doesn't exist
+	if not f then
+		print ("Created new config file: ./data/config.lua")
+		create_config()
+	else
+		f:close()
+	end
+	local config = loadfile ("./data/config.lua")()
+	for v,user in pairs(config.sudo_users) do
+	local user2 = user[2]:gsub('\\','')
+		print("SUDO USER: " ..user2..' ['..user[1]..']')
+	end
+  os.execute(' rm -fr ../.telegram-cli')
 
-  -- load plugins
-  plugins = {}
-  load_plugins()
+	return config
 end
+whoami()
+_config = load_config()
+
+
+
+sudouser =_config.sudouser 
+SUDO = _config.SUDO 
+bot_name = _config.bot_name
+
+
+
+function load_plugins()
+	local config = loadfile ("./data/config.lua")()
+	for k, v in pairs(config.enabled_plugins) do
+		print("Loaded Plugin	", v)
+		local ok, err =  pcall(function()
+		local t = loadfile("plugins/"..v..'.lua')()
+		plugins[v] = t
+		end)
+		if not ok then
+			print('\27[31mError loading plugins '..v..'\27[39m')
+			print(tostring(io.popen("lua plugins/"..v..".lua"):read('*all')))
+			print('\27[31m'..err..'\27[39m')
+		end
+	end
+	print('\n'..#config.enabled_plugins..' Plugins Are Active\n\nStarting TH3BOSS V24 Robot...\n')
+end
+
+load_plugins()
 
 function msg_valid(msg)
-  -- Don't process outgoing messages
-  if msg.out then
-    print('\27[36mNot valid: msg from us\27[39m')
+	 if tonumber(msg.date_) < (tonumber(os.time()) - 60) then
+        print('\27[36m>>-- OLD MESSAGE --<<\27[39m')
+		 return false
+	 end
+
+ if is_gbanned(msg.sender_user_id_) then
+ del_msg(msg.chat_id_, tonumber(msg.id_))
+     kick_user(msg.sender_user_id_, msg.chat_id_)
     return false
-  end
-
-  -- Before bot was started
-  if msg.date < os.time() - 5 then
-    print('\27[36mNot valid: old msg\27[39m')
-    return false
-  end
-
-  if msg.unread == 0 then
-    print('\27[36mNot valid: readed\27[39m')
-    return false
-  end
-
-  if not msg.to.id then
-    print('\27[36mNot valid: To id not provided\27[39m')
-    return false
-  end
-
-  if not msg.from.id then
-    print('\27[36mNot valid: From id not provided\27[39m')
-    return false
-  end
-
-  if msg.from.id == our_id then
-    print('\27[36mNot valid: Msg from our id\27[39m')
-    return false
-  end
-
-  if msg.to.type == 'encr_chat' then
-    print('\27[36mNot valid: Encrypted chat\27[39m')
-    return false
-  end
-
-  if msg.from.id == 777000 then
-    --send_large_msg(*group id*, msg.text) *login code will be sent to GroupID*
-    return false
-  end
-
-  return true
-end
-
---
-function pre_process_service_msg(msg)
-   if msg.service then
-      local action = msg.action or {type=""}
-      -- Double ! to discriminate of normal actions
-      msg.text = "!!tgservice " .. action.type
-
-      -- wipe the data to allow the bot to read service messages
-      if msg.out then
-         msg.out = false
-      end
-      if msg.from.id == our_id then
-         msg.from.id = 0
-      end
    end
-   return msg
+   
+    return true
 end
 
--- Apply plugin.pre_process function
-function pre_process_msg(msg)
-  for name,plugin in pairs(plugins) do
-    if plugin.pre_process and msg then
-      print('Preprocess', name)
-      msg = plugin.pre_process(msg)
-    end
-  end
-  return msg
-end
-
--- Go over enabled plugins patterns.
-function match_plugins(msg)
-  for name, plugin in pairs(plugins) do
-    match_plugin(plugin, name, msg)
-  end
+function match_pattern(pattern, text, lower_case)
+	if text then
+		local matches = {}
+		if lower_case then
+			matches = { string.match(text:lower(), pattern) }
+		else
+			matches = { string.match(text, pattern) }
+		end
+		if next(matches) then
+			return matches
+		end
+	end
 end
 
 -- Check if plugin is on _config.disabled_plugin_on_chat table
@@ -140,9 +235,9 @@ local function is_plugin_disabled_on_chat(plugin_name, receiver)
     -- Checks if plugin is disabled on this chat
     for disabled_plugin,disabled in pairs(disabled_chats[receiver]) do
       if disabled_plugin == plugin_name and disabled then
-        local warning = 'Plugin '..disabled_plugin..' is disabled on this chat'
+        local warning = '_Plugin_ *'..check_markdown(disabled_plugin)..'* _is disabled on this chat_'
         print(warning)
-        send_msg(receiver, warning, ok_cb, false)
+						tdcli.sendMessage(receiver, "", 0, warning, 0, "md")
         return true
       end
     end
@@ -151,551 +246,193 @@ local function is_plugin_disabled_on_chat(plugin_name, receiver)
 end
 
 function match_plugin(plugin, plugin_name, msg)
-  local receiver = get_receiver(msg)
-
-  -- Go over patterns. If one matches it's enough.
-  for k, pattern in pairs(plugin.patterns) do
-    local matches = match_pattern(pattern, msg.text)
-    if matches then
-      print("msg matches: ", pattern)
-
-      if is_plugin_disabled_on_chat(plugin_name, receiver) then
+	if plugin.pre_process then
+        --If plugin is for privileged users only
+		local result = plugin.pre_process(msg)
+		if result then
+			print("pre process: ", plugin_name)
+        -- tdcli.sendMessage(msg.chat_id_, "", 0, result, 0, "md")
+		end
+	end
+	for k, pattern in pairs(plugin.patterns) do
+		matches = match_pattern(pattern, msg.content_.text_ or msg.content_.caption_)
+		if matches then
+      if is_plugin_disabled_on_chat(plugin_name, msg.chat_id_) then
         return nil
       end
-      -- Function exists
-      if plugin.run then
-        -- If plugin is for privileged users only
+			print("Message matches: ", pattern..' | Plugin: '..plugin_name)
+			if plugin.run then
         if not warns_user_not_allowed(plugin, msg) then
-          local result = plugin.run(msg, matches)
-          if result then
-            send_large_msg(receiver, result)
-          end
-        end
-      end
-      -- One patterns matches
-      return
-    end
-  end
-end
-
--- DEPRECATED, use send_large_msg(destination, text)
-function _send_msg(destination, text)
-  send_large_msg(destination, text)
-end
-
--- Save the content of _config to config.lua
-function save_config( )
-  serialize_to_file(_config, './data/config.lua')
-  print ('saved config into ./data/config.lua')
-end
-
--- Returns the config from config.lua file.
--- If file doesn't exist, create it.
-function load_config( )
-  local f = io.open('./data/config.lua', "r")
-  -- If config.lua doesn't exist
-  if not f then
-    print ("Created new config file: data/config.lua")
-    create_config()
-  else
-    f:close()
-  end
-  local config = loadfile ("./data/config.lua")()
-  for v,user in pairs(config.sudo_users) do
-    print("Sudo user: " .. user)
-  end
-  return config
-end
-
--- Create a basic config.json file and saves it.
-function create_config( )
-  -- A simple config with basic plugins and ourselves as privileged user
-  config = {
-    enabled_plugins = {
-	"admin",
-    "onservice",
-    "inrealm",
-    "ingroup",
-    "inpm",
-    "banhammer",
-    "stats",
-    "anti_spam",
-    "owners",
-    "arabic_lock",
-    "set",
-    "get",
-    "broadcast",
-    "invite",
-    "all",
-    "leave_ban",
-    "plugins",
-    "version",
-	"supergroup",
-	"whitelist",
-	"msg_checks"
-    },
-    sudo_users = {157059515,103214508},--Sudo users
-    moderation = {data = 'data/moderation.json'},
-    about_text = [[Api TeleBeyond V1.0 Open Source
-An Advanced Administration Api Bot Based On TeleSeed Written In Lua
-
-Source On GitHub :
-http://GitHub.com/BeyondTeam/Api-TeleBeyond
-
-Sudo Users :
-
-Developer&Founder : @SoLiD021
-
-Developer&Manager : @idivanmanheb
-
-Team Channel :
-Telegram.me/BeyondTeam
-
-Special Thx To :
-@MrHalix
-@TeleProTeam
-And All My Friends :D
-]],
-    help_text_realm = [[
-Realm TeleBeyond Commands:
-
-!creategroup [Name]
-Create a group
-
-!createrealm [Name]
-Create a realm
-
-!setname [Name]
-Set realm name
-
-!setabout [group|sgroup] [GroupID] [Text]
-Set a group's about text
-
-!setrules [GroupID] [Text]
-Set a group's rules
-
-!lock [GroupID] [setting]
-Lock a group's setting
-
-!unlock [GroupID] [setting]
-Unock a group's setting
-
-!settings [group|sgroup] [GroupID]
-Set settings for GroupID
-
-!wholist
-Get a list of members in group/realm
-
-!who
-Get a file of members in group/realm
-
-!type
-Get group type
-
-!kill chat [GroupID]
-Kick all memebers and delete group
-
-!kill realm [RealmID]
-Kick all members and delete realm
-
-!addadmin [id|username]
-Promote an admin by id OR username *Sudo only
-
-!removeadmin [id|username]
-Demote an admin by id OR username *Sudo only
-
-!list groups
-Get a list of all groups
-
-!list realms
-Get a list of all realms
-
-!support
-Promote user to support
-
-!-support
-Demote user from support
-
-!log
-Get a logfile of current group or realm
-
-!broadcast [text]
-!broadcast Hello !
-Send text to all groups
-Only sudo users can run this command
-
-!bc [group_id] [text]
-!bc 123456789 Hello !
-This command will send text to [group_id]
-
-
-**You can use "#", "!", or "/" to begin all commands
-
-
-*Only admins and sudo can add bots in group
-
-
-*Only admins and sudo can use kick,ban,unban,newlink,setphoto,setname,lock,unlock,set rules,set about and settings commands
-
-*Only admins and sudo can use res, setowner, commands
-TeleBeyond V1.0
-Channel : @BeyondTeam
-Source : GitHub.com/BeyondTeam/Api-TeleBeyond
-]],
-    help_text = [[
-Commands list :
-
-!kick [username|id]
-You can also do it by reply
-
-!ban [ username|id]
-You can also do it by reply
-
-!unban [id]
-You can also do it by reply
-
-!who
-Members list
-
-!modlist
-Moderators list
-
-!promote [username]
-Promote someone
-
-!demote [username]
-Demote someone
-
-!kickme
-Will kick user
-
-!about
-Group description
-
-!setphoto
-Set and locks group photo
-
-!setname [name]
-Set group name
-
-!rules
-Group rules
-
-!id
-return group id or user id
-
-!help
-Returns help text
-
-!lock [links|flood|spam|Arabic|member|rtl|sticker|contacts]
-Lock group settings
-*rtl: Kick user if Right To Left Char. is in name*
-
-!unlock [links|flood|spam|Arabic|member|rtl|sticker|contacts]
-Unlock group settings
-*rtl: Kick user if Right To Left Char. is in name*
-
-!mute [all|audio|gifs|photo|video]
-mute group message types
-*If "muted" message type: user is kicked if message type is posted 
-
-!unmute [all|audio|gifs|photo|video]
-Unmute group message types
-*If "unmuted" message type: user is not kicked if message type is posted 
-
-!set rules <text>
-Set <text> as rules
-
-!set about <text>
-Set <text> as about
-
-!settings
-Returns group settings
-
-!muteslist
-Returns mutes for chat
-
-!muteuser [username]
-Mute a user in chat
-*user is kicked if they talk
-*only owners can mute | mods and owners can unmute
-
-!mutelist
-Returns list of muted users in chat
-
-!newlink
-create/revoke your group link
-
-!link
-returns group link
-
-!owner
-returns group owner id
-
-!setowner [id]
-Will set id as owner
-
-!setflood [value]
-Set [value] as flood sensitivity
-
-!stats
-Simple message statistics
-
-!save [value] <text>
-Save <text> as [value]
-
-!get [value]
-Returns text of [value]
-
-!clean [modlist|rules|about]
-Will clear [modlist|rules|about] and set it to nil
-
-!res [username]
-returns user id
-"!res @username"
-
-!log
-Returns group logs
-
-!banlist
-will return group ban list
-
-**You can use "#", "!", or "/" to begin all commands
-
-
-*Only owner and mods can add bots in group
-
-
-*Only moderators and owner can use kick,ban,unban,newlink,link,setphoto,setname,lock,unlock,set rules,set about and settings commands
-
-*Only owner can use res,setowner,promote,demote and log commands
-TeleBeyond V1.0
-Channel : @BeyondTeam
-Source : GitHub.com/BeyondTeam/Api-TeleBeyond
-]],
-	help_text_super =[[
-SuperGroup Commands:
-
-!info
-Displays general info about the SuperGroup
-
-!admins
-Returns SuperGroup admins list
-
-!owner
-Returns group owner
-
-!modlist
-Returns Moderators list
-
-!bots
-Lists bots in SuperGroup
-
-!who
-Lists all users in SuperGroup
-
-!block
-Kicks a user from SuperGroup
-*Adds user to blocked list*
-
-!ban
-Bans user from the SuperGroup
-
-!unban
-Unbans user from the SuperGroup
-
-!id
-Return SuperGroup ID or user id
-*For userID's: !id @username or reply !id*
-
-!id from
-Get ID of user message is forwarded from
-
-!kickme
-Kicks user from SuperGroup
-*Must be unblocked by owner or use join by pm to return*
-
-!setowner
-Sets the SuperGroup owner
-
-!promote [username|id]
-Promote a SuperGroup moderator
-
-!demote [username|id]
-Demote a SuperGroup moderator
-
-!setname
-Sets the chat name
-
-!setphoto
-Sets the chat photo
-
-!setrules
-Sets the chat rules
-
-!setabout
-Sets the about section in chat info(members list)
-
-!save [value] <text>
-Sets extra info for chat
-
-!get [value]
-Retrieves extra info for chat by value
-
-!newlink
-Generates a new group link
-
-!link
-Retireives the group link
-
-!rules
-Retrieves the chat rules
-
-!lock [links|flood|spam|Arabic|member|rtl|sticker|contacts]
-Lock group settings
-*rtl: kick user if Right To Left Char. is in name*
-
-!unlock [links|flood|spam|Arabic|member|rtl|sticker|contacts]
-Unlock group settings
-*rtl: kick user if Right To Left Char. is in name*
-
-!mute [all|audio|gifs|photo|video|service]
-mute group message types
-*A "muted" message type is auto-deleted if posted
-
-!unmute [all|audio|gifs|photo|video|service]
-Unmute group message types
-*A "unmuted" message type is not auto-deleted if posted
-
-!setflood [value]
-Set [value] as flood sensitivity
-
-!settings
-Returns chat settings
-
-!muteslist
-Returns mutes for chat
-
-!muteuser [username]
-Mute a user in chat
-*If a muted user posts a message, the message is deleted automaically
-*only owners can mute | mods and owners can unmute
-
-!mutelist
-Returns list of muted users in chat
-
-!banlist
-Returns SuperGroup ban list
-
-!clean [rules|about|modlist|mutelist]
-
-!public [yes|no]
-Set chat visibility in pm !chats or !chatlist commands
-
-!res [username]
-Returns users name and id by username
-
-
-!log
-Returns group logs
-*Search for kick reasons using [#RTL|#spam|#lockmember]
-
-**You can use "#", "!", or "/" to begin all commands
-
-*Only owner can add members to SuperGroup
-(use invite link to invite)
-
-*Only moderators and owner can use block, ban, unban, newlink, link, setphoto, setname, lock, unlock, setrules, setabout and settings commands
-
-*Only owner can use res, setowner, promote, demote, and log commands
-TeleBeyond V1.0
-Channel : @BeyondTeam
-Source : GitHub.com/BeyondTeam/Api-TeleBeyond
-]],
-  }
-  serialize_to_file(config, './data/config.lua')
-  print('saved config into ./data/config.lua')
-end
-
-function on_our_id (id)
-  our_id = id
-end
-
-function on_user_update (user, what)
-  --vardump (user)
-end
-
-function on_chat_update (chat, what)
-  --vardump (chat)
-end
-
-function on_secret_chat_update (schat, what)
-  --vardump (schat)
-end
-
-function on_get_difference_end ()
-end
-
--- Enable plugins in config.json
-function load_plugins()
-  for k, v in pairs(_config.enabled_plugins) do
-    print("Loading plugin", v)
-
-    local ok, err =  pcall(function()
-      local t = loadfile("plugins/"..v..'.lua')()
-      plugins[v] = t
-    end)
-
-    if not ok then
-      print('\27[31mError loading plugin '..v..'\27[39m')
-	  print(tostring(io.popen("lua plugins/"..v..".lua"):read('*all')))
-      print('\27[31m'..err..'\27[39m')
-    end
-
-  end
-end
-
--- custom add
-function load_data(filename)
-
-	local f = io.open(filename)
-	if not f then
-		return {}
+				local result = plugin.run(msg, matches)
+					if result then
+						tdcli.sendMessage(msg.chat_id_, msg.id_, 0, result, 0, "md")
+                 end
+					end
+			end
+			return
+		end
 	end
-	local s = f:read('*all')
-	f:close()
-	local data = JSON.decode(s)
-
-	return data
-
 end
 
-function save_data(filename, data)
-
-	local s = JSON.encode(data)
-	local f = io.open(filename, 'w')
-	f:write(s)
-	f:close()
-
+function file_cb(msg)
+	if msg.content_.ID == "MessagePhoto" then
+		photo_id = ''
+		local function get_cb(arg, data)
+		if data.content_.photo_.sizes_[2] then
+			photo_id = data.content_.photo_.sizes_[2].photo_.id_
+			else
+			photo_id = data.content_.photo_.sizes_[1].photo_.id_
+			end
+			tdcli.downloadFile(photo_id, dl_cb, nil)
+		end
+		tdcli_function ({ ID = "GetMessage", chat_id_ = msg.chat_id_, message_id_ = msg.id_ }, get_cb, nil)
+	elseif msg.content_.ID == "MessageVideo" then
+		video_id = ''
+		local function get_cb(arg, data)
+			video_id = data.content_.video_.video_.id_
+			tdcli.downloadFile(video_id, dl_cb, nil)
+		end
+		tdcli_function ({ ID = "GetMessage", chat_id_ = msg.chat_id_, message_id_ = msg.id_ }, get_cb, nil)
+	elseif msg.content_.ID == "MessageAnimation" then
+		anim_id, anim_name = '', ''
+		local function get_cb(arg, data)
+			anim_id = data.content_.animation_.animation_.id_
+			anim_name = data.content_.animation_.file_name_
+			 tdcli.downloadFile(anim_id, dl_cb, nil)
+		end
+		tdcli_function ({ ID = "GetMessage", chat_id_ = msg.chat_id_, message_id_ = msg.id_ }, get_cb, nil)
+	elseif msg.content_.ID == "MessageVoice" then
+		voice_id = ''
+		local function get_cb(arg, data)
+			voice_id = data.content_.voice_.voice_.id_
+			tdcli.downloadFile(voice_id, dl_cb, nil)
+		end
+		tdcli_function ({ ID = "GetMessage", chat_id_ = msg.chat_id_, message_id_ = msg.id_ }, get_cb, nil)
+	elseif msg.content_.ID == "MessageAudio" then
+		audio_id, audio_name, audio_title = '', '', ''
+		local function get_cb(arg, data)
+			audio_id = data.content_.audio_.audio_.id_
+			audio_name = data.content_.audio_.file_name_
+			audio_title = data.content_.audio_.title_
+			tdcli.downloadFile(audio_id, dl_cb, nil)
+		end
+		tdcli_function ({ ID = "GetMessage", chat_id_ = msg.chat_id_, message_id_ = msg.id_ }, get_cb, nil)
+	elseif msg.content_.ID == "MessageSticker" then
+		sticker_id = ''
+		local function get_cb(arg, data)
+			sticker_id = data.content_.sticker_.sticker_.id_
+			tdcli.downloadFile(sticker_id, dl_cb, nil)
+		end
+		tdcli_function ({ ID = "GetMessage", chat_id_ = msg.chat_id_, message_id_ = msg.id_ }, get_cb, nil)
+	elseif msg.content_.ID == "MessageDocument" then
+		document_id, document_name = '', ''
+		local function get_cb(arg, data)
+			document_id = data.content_.document_.document_.id_
+			document_name = data.content_.document_.file_name_
+			tdcli.downloadFile(document_id, dl_cb, nil)
+		end
+		tdcli_function ({ ID = "GetMessage", chat_id_ = msg.chat_id_, message_id_ = msg.id_ }, get_cb, nil)
+end
 end
 
+function tdcli_update_callback (data)
+	if data.message_ then
+		if msg_caption ~= get_text_msg() then
+			msg_caption = get_text_msg()
+		end
+	end
+	if (data.ID == "UpdateNewMessage") then
 
--- Call and postpone execution for cron plugins
-function cron_plugins()
-
-  for name, plugin in pairs(plugins) do
-    -- Only plugins with cron function
-    if plugin.cron ~= nil then
-      plugin.cron()
+		local msg = data.message_
+		local d = data.disable_notification_
+		local chat = chats[msg.chat_id_]
+		local hash = 'msgs:'..msg.sender_user_id_..':'..msg.chat_id_
+		redis:incr(hash)
+		if redis:get('markread') == 'on' then
+			tdcli.viewMessages(msg.chat_id_, {[0] = msg.id_}, dl_cb, nil)
     end
-  end
+		if ((not d) and chat) then
+			if msg.content_.ID == "MessageText" then
+				do_notify (chat.title_, msg.content_.text_)
+			else
+				do_notify (chat.title_, msg.content_.ID)
+			end
+		end
+		if msg_valid(msg) then
+		var_cb(msg, msg)
+		file_cb(msg)
+	if msg.content_.ID == "MessageText" then
+			msg.text = msg.content_.text_
+			msg.edited = false
+			msg.pinned = false
 
-  -- Called again in 2 mins
-  postpone (cron_plugins, false, 120)
+	elseif msg.content_.ID == "MessagePinMessage" then
+		msg.pinned = true
+	elseif msg.content_.ID == "MessagePhoto" then
+		msg.photo_ = true 
+
+	elseif msg.content_.ID == "MessageVideo" then
+		msg.video_ = true
+
+	elseif msg.content_.ID == "MessageAnimation" then
+		msg.animation_ = true
+
+	elseif msg.content_.ID == "MessageVoice" then
+		msg.voice_ = true
+
+	elseif msg.content_.ID == "MessageAudio" then
+		msg.audio_ = true
+
+	elseif msg.content_.ID == "MessageForwardedFromUser" then
+		msg.forward_info_ = true
+
+	elseif msg.content_.ID == "MessageSticker" then
+		msg.sticker_ = true
+
+	elseif msg.content_.ID == "MessageContact" then
+		msg.contact_ = true
+	elseif msg.content_.ID == "MessageDocument" then
+		msg.document_ = true
+
+	elseif msg.content_.ID == "MessageLocation" then
+		msg.location_ = true
+	elseif msg.content_.ID == "MessageGame" then
+		msg.game_ = true
+	elseif msg.content_.ID == "MessageChatAddMembers" then
+			for i=0,#msg.content_.members_ do
+				msg.adduser = msg.content_.members_[i].id_
+		end
+		
+		
+	elseif msg.content_.ID == "MessageChatJoinByLink" then
+			msg.joinuser = msg.sender_user_id_
+	elseif msg.content_.ID == "MessageChatDeleteMember" then
+			msg.deluser = true
+      end
+	end
+	elseif data.ID == "UpdateMessageContent" then  
+		cmsg = data
+		local function edited_cb(arg, data)
+			msg = data
+			msg.media = {}
+			if cmsg.new_content_.text_ then
+				msg.text = cmsg.new_content_.text_
+			end
+			if cmsg.new_content_.caption_ then
+				msg.media.caption = cmsg.new_content_.caption_
+			end
+			msg.edited = true
+		if msg_valid(msg) then
+			var_cb(msg, msg)
+        end
+		end
+	tdcli_function ({ ID = "GetMessage", chat_id_ = data.chat_id_, message_id_ = data.message_id_ }, edited_cb, nil)
+	elseif data.ID == "UpdateFile" then
+		file_id = data.file_.id_
+	elseif (data.ID == "UpdateChat") then
+		chat = data.chat_
+		chats[chat.id_] = chat
+	elseif (data.ID == "UpdateOption" and data.name_ == "my_id") then
+		tdcli_function ({ID="GetChats", offset_order_="9223372036854775807", offset_chat_id_=0, limit_=20}, dl_cb, nil)    
+	end
 end
-
--- Start and load values
-our_id = 0
-now = os.time()
-math.randomseed(now)
-started = false
